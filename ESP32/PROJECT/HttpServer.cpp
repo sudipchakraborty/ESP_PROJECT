@@ -1,102 +1,116 @@
 #include "HttpServer.h"
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ArduinoJson.h>
 
-///////////////////////////
-// ✅ Define global variables **only here**
-const char* ssid = "SUDIP_LAB";  // ✅ Properly defined here
-const char* password = "Anindita@01092016";  // ✅ Properly defined here
+const char* ssid = "SUDIP_LAB";
+const char* password = "Anindita@01092016";
 
 WebServer server(80);
 
 // Static IP configuration
-IPAddress staticIP(192, 168, 0, 100); // Desired static IP
-IPAddress gateway(192, 168, 0, 1);    // Router's IP
+IPAddress staticIP(192, 168, 0, 100);
+IPAddress gateway(192, 168, 0, 1);
 IPAddress subnet(255, 255, 255, 0);
-IPAddress dns(8, 8, 8, 8);         // DNS Server
+IPAddress dns(8, 8, 8, 8);
 
-HttpServer::HttpServer()  // Constructor
-{   
-}
+HttpServer::HttpServer() {}
 
-//__________________________________________________________________________________________________
+// Initialize the server module
 void HttpServer::init()
 {
-  WiFi.mode(WIFI_STA);
-  if (!WiFi.config(staticIP, gateway, subnet, dns)) {
-    Serial.println("Failed to configure static IP");
-  }
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi...");
-  while (WiFi.status() != WL_CONNECTED) { 
-    delay(1000); 
-    Serial.print(".");
-  }
-  Serial.println("\nConnected to WiFi");
-  Serial.print("Assigned IP Address: ");
-  Serial.println(WiFi.localIP());
-  
-  // Use lambda functions to reference class member functions
-  server.on("/", [this]() { this->handleRoot(); });
-  server.on("/open", [this]() { this->handleUnlock(); });
-  server.on("/close", [this]() { this->handleLock(); });
-  server.on("/status", [this]() { this->handleStatus(); });
-  server.on("/ledOn", [this]() { this->handleLedOn(); });
-  server.on("/ledOff", [this]() { this->handleLedOff(); });
-  
-  server.begin();
+    WiFi.mode(WIFI_STA);
+    if (!WiFi.config(staticIP, gateway, subnet, dns)) {
+        Serial.println("Failed to configure static IP");
+    }
+    WiFi.begin(ssid, password);
+    Serial.print("Connecting to WiFi...");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.print(".");
+    }
+    Serial.println("\nConnected to WiFi");
+    Serial.print("Assigned IP Address: ");
+    Serial.println(WiFi.localIP());
+
+    // Route Handlers
+    server.on("/", [this]() { this->handleRoot(); });
+    server.on("/open", [this]() { this->handleOpen(); });
+    server.on("/close", [this]() { this->handleClose(); });
+    server.on("/status", [this]() { this->handleStatus(); });
+
+    server.begin();
 }
 
-//__________________________________________________________________________________________________
-void HttpServer::handle()
-{
-   server.handleClient();
+// Handle server requests
+void HttpServer::handle() {
+    server.handleClient();
 }
 
-//__________________________________________________________________________________________________
-void HttpServer::handleUnlock() {
-  String response = "{\"status\": \"Door Opened\"}";
-  server.send(200, "application/json", response);
+// Root Page with Buttons for Door Control
+void HttpServer::handleRoot() {
+    Serial.println("Root Request Received..");
+
+    String html = "<!DOCTYPE html><html><head>"
+                  "<title>Smart Door Control</title>"
+                  "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+                  "<script>"
+                  "function toggleDoor(state) {"
+                  " fetch(state === 'open' ? '/open' : '/close');"
+                  "}"
+                  "</script>"
+                  "</head><body>"
+                  "<h2>Smart Door Control</h2>"
+                  "<button onclick=\"toggleDoor('open')\">Door Open</button>"
+                  "<button onclick=\"toggleDoor('close')\">Door Close</button>"
+                  "</body></html>";
+
+    server.send(200, "text/html", html);
 }
 
-//__________________________________________________________________________________________________
-void HttpServer::handleLock() {
-  String response = "{\"status\": \"Door Closed\"}";
-  server.send(200, "application/json", response);
+// Handle Open Door
+void HttpServer::handleOpen() {
+    command = "Door";
+    value = "Open";
+    Status = "Open"; // Store status
+    SendResponse("Door Opened");
+    Serial.println("Door Open Request Received.");
 }
 
-//__________________________________________________________________________________________________
+// Handle Close Door
+void HttpServer::handleClose() {
+    command = "Door";
+    value = "Close";
+    Status = "Close"; // Store status
+    SendResponse("Door Closed");
+    Serial.println("Door Close Request Received.");
+}
+
+// Handle Status Request
 void HttpServer::handleStatus() {
-  String response = "{\"status\": \"OK\"}";
-  server.send(200, "application/json", response);
+    SendResponse(Status);
+    Serial.println("Door Status Request Received.");
 }
 
-//__________________________________________________________________________________________________
-void HttpServer::handleRoot() {  
-  Serial.println("Request Received..");
+// Send JSON Response
+void HttpServer::SendResponse(String msg) {
+    StaticJsonDocument<200> doc;
+    doc["message"] = msg;
+    doc["status"] = Status; // Include door status in response
+    doc["timestamp"] = millis();
 
-  String html = "<!DOCTYPE html><html><head>"
-                "<title>Smart Door Control</title>"
-                "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-                "<script>"
-                "function toggleLED(state) {"
-                " fetch(state === 'on' ? '/ledOn' : '/ledOff');"
-                "}"
-                "</script>"
-                "</head><body>"
-                "<h2>Smart Door Control</h2>"
-                "<button onclick=\"toggleLED('on')\">ON</button>"
-                "<button onclick=\"toggleLED('off')\">OFF</button>"
-                "</body></html>";
-  server.send(200, "text/html", html);
+    String jsonStr;
+    serializeJson(doc, jsonStr);
+    server.send(200, "application/json", jsonStr);
 }
 
-//__________________________________________________________________________________________________
-void HttpServer::handleLedOn() {
-  server.send(200, "application/json", "{\"status\": \"LED On\"}");
+// Check if a command was received
+bool HttpServer::Command_received() {
+    return !command.isEmpty();
 }
 
-//__________________________________________________________________________________________________
-void HttpServer::handleLedOff() {
-  server.send(200, "application/json", "{\"status\": \"LED Off\"}");
+// Clear received command
+void HttpServer::Command_purge() {
+    command = "";
+    value = "";
 }

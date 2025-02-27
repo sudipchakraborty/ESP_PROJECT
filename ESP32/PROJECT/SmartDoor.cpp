@@ -1,30 +1,44 @@
 #include "SmartDoor.h"
-// #include "mega.h"
-// #include "web.h"
-#include "ledST.h"
 #include "debug.h"
 #include "HttpServer.h"
+#include <ArduinoJson.h>
+#include "ExtComm.h"
 ////////////////////////////////////////////////////
-ledST stl;
 debug dbg;
-HttpServer s;
- 
-///////////////////////////
- 
+HttpServer srv;
+ExtComm mega;
+//////////////////////////////////////
 SmartDoor::SmartDoor()  // Constructor
 {   
 }
 //__________________________________________________________________________________________________________________________________________________________________
-void SmartDoor::init(char pin)
+void SmartDoor::init()
 {
-  stl.init(2);
   dbg.init();
-  s.init();  
+  srv.init();  
+  mega.init();
 }
 //__________________________________________________________________________________________________________________________________________________________________
- void SmartDoor::init(char pin)
+ void SmartDoor::Handle()
 {
-  // dbg.send("count",12344);
-    s.handle();
+    srv.handle();
+   // mega.send("dsfsdfsdfsdf");
+    if(srv.Command_received())
+    {
+        StaticJsonDocument<200> doc;
+        doc["command"] = srv.command;   
+        doc["value"] = srv.value;       
+        doc["timestamp"] = millis(); 
+     
+        String jsonStr;
+        serializeJson(doc, jsonStr);
+        mega.send(jsonStr);   
+        srv.Command_purge();
+        Serial.println(jsonStr);
+    }
+
+    mega.receive();
+     
 }
- 
+//__________________________________________________________________________________________________________________________________________________________________
+

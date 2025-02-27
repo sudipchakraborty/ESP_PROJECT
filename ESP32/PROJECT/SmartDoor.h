@@ -7,6 +7,8 @@ class SmartDoor
 {
     public:
            SmartDoor();
+      void init();
+      void Handle();
     private: 
 };
 ///////////////////////

@@ -34,14 +34,16 @@ void ExtComm::send(String msg)
 // ✅ Renamed function to `receive()`
 void ExtComm::receive()
 {
-  while (Serial2.available()) 
+  if(Serial2.available()) 
   {
     char incomingChar = Serial2.read();  // ✅ Use local variable instead of global
 
     if (incomingChar == '\n') 
     { 
-      parseJson(receivedData);
+     // parseJson(receivedData);
+      Serial.println(receivedData);
       receivedData = ""; // Clear buffer for next message
+      
     } 
     else 
     {
